@@ -1,0 +1,62 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: nginx
+  labels:
+    "owncloud": lemp
+spec:
+  replicas: 1
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - image: arm32v7/nginx:stable
+        name: nginx
+#       resources:
+#         requests:
+#           cpu: 100m
+#           memory: 1Gi
+        env:
+        - name: OWNCLOUD_URL
+          value: http://vudoohaze.dyndns.org
+        - name: OWNCLOUD_PHP_FPM_HOST
+          value: owncloud
+        - name: OWNCLOUD_PHP_FPM_PORT
+          value: "9000"
+        ports:
+        - name: http
+          containerPort: 80
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 5
+          timeoutSeconds: 1
+
+---
+# expose Nginx on port 80 to the world through a load balancer
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginxsvc
+  labels:
+    "owncloud": lemp
+spec:
+# type: LoadBalancer
+  type: NodePort
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80
+    protocol: TCP
+  selector:
+    app: nginx
+

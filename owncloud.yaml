@@ -1,0 +1,92 @@
+
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: owncloud
+  labels:
+    "owncloud": lemp
+spec:
+  replicas: 1
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      app: owncloud
+  template:
+    metadata:
+      labels:
+        app: owncloud
+    spec:
+      volumes:
+  #     - name: owncloud-persistent-storage
+  #       persistentDisk:
+  #         pdName: owncloud_www_$PD_RAND$
+        - name: data
+          emptyDir: {}
+      containers:
+      - image: arm32v7/owncloud:10.0.7-fpm
+        name: owncloud
+        env:
+          - name: OWNCLOUD_DOMAIN
+            value: "vudoohaze.dyndns.org"
+          - name: OWNCLOUD_ADMIN_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: owncloud-credentials
+                key: owncloudadmin
+          - name: OWNCLOUD_ADMIN_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: owncloud-credentials
+                key: owncloudpw
+          - name: OWNCLOUD_DB_TYPE
+            value: mysql
+          - name: OWNCLOUD_DB_HOST
+            value: mysql.default.svc.cluster.local
+          - name: DB_PORT
+            value: "3306"
+          - name: OWNCLOUD_DB_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: owncloud-credentials
+                key: mysqluser
+          - name: OWNCLOUD_DB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: owncloud-credentials
+                key: mysqlpassword
+          - name: OWNCLOUD_DB_NAME
+            value: ownclouddb
+
+        volumeMounts:
+          - mountPath: /var/www/html
+            name: data
+       #    name: owncloud-persistent-storage
+        workingDir: /var/www/html
+
+        ports:
+          - name: php-fpm
+            containerPort: 9000
+            protocol: TCP
+        livenessProbe:
+          tcpSocket:
+            port: 9000
+          initialDelaySeconds: 5
+          timeoutSeconds: 1
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: owncloudsvc
+  labels:
+    "owncloud": lemp
+spec:
+  ports:
+    - name: php-fpm
+      port: 9000
+      targetPort: 9000
+      protocol: TCP
+  selector:
+    app: owncloud
+

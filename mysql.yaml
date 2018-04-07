@@ -1,0 +1,77 @@
+
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: mysql
+  labels:
+    "owncloud": lemp
+spec:
+  replicas: 1
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      volumes:
+  #     - name: mysql-persistent-storage
+  #       persistentDisk:
+  #         pdName: owncloud_mysql_$PD_RAND|default:autogen|PD rand$
+        - name: data
+          emptyDir: {}
+      containers:
+      - image: hypriot/rpi-mysql
+        name: mysql
+  #     resources:
+  #       requests:
+  #         cpu: 1
+  #         memory: 1Gi
+        env:
+          - name: MYSQL_ROOT_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: owncloud-credentials
+                key: mysqlrootpw
+          - name: MYSQL_USER
+            valueFrom:
+              secretKeyRef:
+                name: owncloud-credentials
+                key: mysqluser
+          - name: MYSQL_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: owncloud-credentials
+                key: mysqlpassword
+          - name: MYSQL_DATABASE
+            value: ownclouddb
+        livenessProbe:
+          tcpSocket:
+            port: 3306
+        ports:
+        - containerPort: 3306
+        # attach our persistent disk
+        volumeMounts:
+        - mountPath: /var/lib/mysql
+          name: data
+          subPath: data
+     #    name: mysql-persistent-storage
+
+---
+# expose a pod on mysql.default.svc.cluster.local to the rest of the cluster
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysqlsvc
+  labels:
+    "owncloud": lemp
+spec:
+  type: ClusterIP
+  ports:
+  - port: 3306
+    protocol: TCP
+  selector:
+    app: mysql
